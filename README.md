@@ -1,10 +1,7 @@
-# SentinelSec - Advanced Security Analysis Tool
+# Binsect - Advanced Security Analysis Tool
 
 A comprehensive security analysis tool that performs disassembly, vulnerability detection, packer analysis, and multi-format file inspection.
 
-## ⚠️ Disclaimer
-
-This tool was developed with [GitHub Copilot](https://github.com/copilot) assistance.
 
 ## Features
 
@@ -36,23 +33,23 @@ This tool was developed with [GitHub Copilot](https://github.com/copilot) assist
 
 ```bash
 # Basic analysis
-./sentinelsec /bin/ls
+./binsect /bin/ls
 
 # Specific output format
-./sentinelsec -f hex /usr/bin/passwd     # Hex dump only
-./sentinelsec -f strings document.pdf   # Extract strings
-./sentinelsec -f assembly binary.exe    # Assembly output
+./binsect -f hex /usr/bin/passwd     # Hex dump only
+./binsect -f strings document.pdf   # Extract strings
+./binsect -f assembly binary.exe    # Assembly output
 
 # Force file type
-./sentinelsec -t pe program.exe         # Force PE analysis
-./sentinelsec -t wasm module.wasm       # WebAssembly analysis
-./sentinelsec -t python script.py       # Python script analysis
+./binsect -t pe program.exe         # Force PE analysis
+./binsect -t wasm module.wasm       # WebAssembly analysis
+./binsect -t python script.py       # Python script analysis
 
 # Interactive mode
-./sentinelsec -i                        # Interactive shell
+./binsect -i                        # Interactive shell
 
 # Verbose analysis
-./sentinelsec -v binary_file            # Detailed output
+./binsect -v binary_file            # Detailed output
 ```
 
 ## Output Formats
@@ -76,17 +73,17 @@ This tool was developed with [GitHub Copilot](https://github.com/copilot) assist
 ```bash
 # Clone and build
 git clone <repository_url>
-cd sentinelsec
-make              # Build SentinelSec
+cd binsect
+make              # Build binsect
 
 # Optional: Install to system PATH
-sudo cp sentinelsec /usr/local/bin/
+sudo cp binsect /usr/local/bin/
 ```
 
 ### Build Commands
 
 ```bash
-make              # Build SentinelSec
+make              # Build binsect
 make clean        # Clean build artifacts
 make debug        # Debug build with GDB support
 ```
@@ -154,3 +151,9 @@ Overall Risk Level: HIGH
 ## License
 
 Educational and security research tool. Use responsibly and in compliance with applicable laws.
+
+## ⚠️ Disclaimer
+
+This tool was developed with [GitHub Copilot](https://github.com/copilot) assistance.
+> for educational purposes only
+
