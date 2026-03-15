@@ -1,5 +1,8 @@
 #define _GNU_SOURCE
-#include "disassembler.h"
+#include "module_registry.h"
+#include "packer_api.h"
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -120,8 +123,8 @@ static bool check_packer_patterns(uint8_t *data, size_t length)
     return false;
 }
 
-// Main packer detection function
-PackerResult detect_packer(uint8_t *data, size_t length)
+// Built-in signature and heuristic detector used by the registry.
+PackerResult detect_packer_signature(uint8_t *data, size_t length)
 {
     PackerResult result = {PACKER_NONE, "None", 0.0f, NULL, false};
 
@@ -177,6 +180,13 @@ PackerResult detect_packer(uint8_t *data, size_t length)
     result.is_packed = (max_confidence > 0.3f);
 
     return result;
+}
+
+// Main packer detection entrypoint that runs all registered detector modules.
+PackerResult detect_packer(uint8_t *data, size_t length)
+{
+    register_builtin_modules();
+    return run_registered_packer_detectors(data, length);
 }
 
 // Get packer name from type

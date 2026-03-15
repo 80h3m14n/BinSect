@@ -1,4 +1,6 @@
-#include "disassembler.h"
+#include "advanced_formats_api.h"
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -17,7 +19,6 @@ bool analyze_macho_format(uint8_t *data, size_t length)
 
     // Check for Mach-O magic numbers
     uint32_t magic = *(uint32_t *)data;
-    bool is_64bit = false;
 
     switch (magic)
     {
@@ -26,7 +27,6 @@ bool analyze_macho_format(uint8_t *data, size_t length)
         break;
     case 0xFEEDFACF: // 64-bit Mach-O
         printf("Format: Mach-O 64-bit\n");
-        is_64bit = true;
         break;
     case 0xCAFEBABE: // Universal binary
         printf("Format: Universal Binary (Fat Binary)\n");
@@ -54,7 +54,6 @@ bool analyze_macho_format(uint8_t *data, size_t length)
     if (length > 16)
     {
         uint32_t cpu_type = *(uint32_t *)(data + 4);
-        uint32_t cpu_subtype = *(uint32_t *)(data + 8);
         uint32_t file_type = *(uint32_t *)(data + 12);
         uint32_t num_cmds = *(uint32_t *)(data + 16);
 
@@ -350,21 +349,17 @@ bool analyze_script_format(uint8_t *data, size_t length, FileFormat format)
         return false;
 
     const char *script_type = "";
-    const char *extension = "";
 
     switch (format)
     {
     case FORMAT_POWERSHELL:
         script_type = "PowerShell";
-        extension = ".ps1";
         break;
     case FORMAT_PYTHON:
         script_type = "Python";
-        extension = ".py";
         break;
     case FORMAT_JAVASCRIPT:
         script_type = "JavaScript";
-        extension = ".js";
         break;
     default:
         return false;

@@ -1,4 +1,8 @@
-#include "disassembler.h"
+#include "advanced_formats_api.h"
+#include "formats_api.h"
+#include "module_registry.h"
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -30,6 +34,78 @@ static const struct
 };
 
 static const size_t num_signatures = sizeof(format_signatures) / sizeof(format_signatures[0]);
+
+static bool is_identifier_char(char c)
+{
+    return isalnum((unsigned char)c) || c == '_';
+}
+
+static bool contains_keyword(const char *text, const char *keyword)
+{
+    if (text == NULL || keyword == NULL || keyword[0] == '\0')
+    {
+        return false;
+    }
+
+    const size_t key_len = strlen(keyword);
+    const char *cursor = text;
+    while ((cursor = strstr(cursor, keyword)) != NULL)
+    {
+        const bool left_ok = (cursor == text) || !is_identifier_char(cursor[-1]);
+        const char right = cursor[key_len];
+        const bool right_ok = (right == '\0') || !is_identifier_char(right);
+        if (left_ok && right_ok)
+        {
+            return true;
+        }
+
+        cursor += key_len;
+    }
+
+    return false;
+}
+
+static bool is_probably_text(uint8_t *data, size_t length)
+{
+    if (data == NULL || length == 0)
+    {
+        return false;
+    }
+
+    const size_t sample_len = length > 4096 ? 4096 : length;
+    size_t printable_or_ws = 0;
+    size_t alpha_count = 0;
+    size_t nul_count = 0;
+
+    for (size_t i = 0; i < sample_len; i++)
+    {
+        const unsigned char c = data[i];
+        if (c == '\0')
+        {
+            nul_count++;
+            continue;
+        }
+
+        if (isprint(c) || c == '\n' || c == '\r' || c == '\t')
+        {
+            printable_or_ws++;
+            if (isalpha(c))
+            {
+                alpha_count++;
+            }
+        }
+    }
+
+    if (nul_count > 0)
+    {
+        return false;
+    }
+
+    const double printable_ratio = (double)printable_or_ws / (double)sample_len;
+    const double alpha_ratio = (double)alpha_count / (double)sample_len;
+
+    return printable_ratio >= 0.90 && alpha_ratio >= 0.20;
+}
 
 // Detect file format based on magic bytes
 FileFormat detect_file_format(uint8_t *data, size_t length)
@@ -86,10 +162,9 @@ FileFormat detect_file_format(uint8_t *data, size_t length)
                     // Check if it's Java class (has version info at offset 4-6)
                     if (length > 8)
                     {
-                        uint16_t minor = __builtin_bswap16(*(uint16_t *)(data + 4));
                         uint16_t major = __builtin_bswap16(*(uint16_t *)(data + 6));
                         // Java class files have reasonable version numbers
-                        if (major >= 45 && major <= 65 && minor <= 65535)
+                        if (major >= 45 && major <= 65)
                         {
                             return FORMAT_CLASS;
                         }
@@ -112,8 +187,20 @@ FileFormat detect_file_format(uint8_t *data, size_t length)
         {
             return FORMAT_POWERSHELL;
         }
-        if (strstr(text, "param(") || strstr(text, "Get-") || strstr(text, "Set-") ||
-            strstr(text, "$_") || strstr(text, "Write-Host"))
+        int ps_score = 0;
+        if (strstr(text, "param("))
+            ps_score++;
+        if (strstr(text, "Get-"))
+            ps_score++;
+        if (strstr(text, "Set-"))
+            ps_score++;
+        if (strstr(text, "$_"))
+            ps_score++;
+        if (strstr(text, "Write-Host"))
+            ps_score++;
+        if (strstr(text, "Invoke-Expression") || contains_keyword(text, "IEX"))
+            ps_score++;
+        if (ps_score >= 2)
         {
             return FORMAT_POWERSHELL;
         }
@@ -124,8 +211,18 @@ FileFormat detect_file_format(uint8_t *data, size_t length)
         {
             return FORMAT_PYTHON;
         }
-        if (strstr(text, "import ") || strstr(text, "def ") ||
-            strstr(text, "if __name__ == '__main__'"))
+        int py_score = 0;
+        if (contains_keyword(text, "import"))
+            py_score++;
+        if (contains_keyword(text, "def"))
+            py_score++;
+        if (contains_keyword(text, "class"))
+            py_score++;
+        if (contains_keyword(text, "from"))
+            py_score++;
+        if (strstr(text, "if __name__ == '__main__'"))
+            py_score += 2;
+        if (py_score >= 2)
         {
             return FORMAT_PYTHON;
         }
@@ -135,11 +232,38 @@ FileFormat detect_file_format(uint8_t *data, size_t length)
         {
             return FORMAT_JAVASCRIPT;
         }
-        if (strstr(text, "function ") || strstr(text, "var ") ||
-            strstr(text, "let ") || strstr(text, "const ") ||
-            strstr(text, "console.log"))
+        int js_score = 0;
+        if (contains_keyword(text, "function"))
+            js_score++;
+        if (contains_keyword(text, "var"))
+            js_score++;
+        if (contains_keyword(text, "let"))
+            js_score++;
+        if (contains_keyword(text, "const"))
+            js_score++;
+        if (strstr(text, "console.log"))
+            js_score++;
+        if (contains_keyword(text, "document") || contains_keyword(text, "window"))
+            js_score++;
+
+        bool js_structure = false;
+        if (strstr(text, "function(") || strstr(text, "=>") || strstr(text, "console.log("))
+        {
+            js_structure = true;
+        }
+        else if (strstr(text, ";") && (strstr(text, "{") || strstr(text, "}")))
+        {
+            js_structure = true;
+        }
+
+        if (js_score >= 2 && js_structure)
         {
             return FORMAT_JAVASCRIPT;
+        }
+
+        if (is_probably_text(data, length))
+        {
+            return FORMAT_TEXT;
         }
     }
 
@@ -175,6 +299,8 @@ const char *get_format_name(FileFormat format)
         return "Python Script";
     case FORMAT_JAVASCRIPT:
         return "JavaScript";
+    case FORMAT_TEXT:
+        return "Text";
     case FORMAT_FIRMWARE:
         return "Firmware Image";
     case FORMAT_UNKNOWN:
@@ -292,6 +418,12 @@ bool process_file_format(uint8_t *data, size_t length, FileFormat format)
     printf("\n=== FILE FORMAT ANALYSIS ===\n");
     printf("Detected Format: %s\n", get_format_name(format));
 
+    bool continue_disassembly = false;
+    if (run_registered_format_handler(format, data, length, &continue_disassembly))
+    {
+        return continue_disassembly;
+    }
+
     switch (format)
     {
     case FORMAT_PE:
@@ -339,30 +471,10 @@ bool process_file_format(uint8_t *data, size_t length, FileFormat format)
         printf("    - May be compressed (gzip, bzip2, etc.)\n");
         break;
 
-    case FORMAT_MACHO:
-        analyze_macho_format(data, length);
-        break;
-
-    case FORMAT_DEX:
-        analyze_dex_format(data, length);
-        break;
-
-    case FORMAT_CLASS:
-        analyze_class_format(data, length);
-        break;
-
-    case FORMAT_WASM:
-        analyze_wasm_format(data, length);
-        break;
-
-    case FORMAT_POWERSHELL:
-    case FORMAT_PYTHON:
-    case FORMAT_JAVASCRIPT:
-        analyze_script_format(data, length, format);
-        break;
-
-    case FORMAT_FIRMWARE:
-        analyze_firmware_format(data, length);
+    case FORMAT_TEXT:
+        printf("  Text File Analysis:\n");
+        printf("    - Human-readable text content detected\n");
+        printf("    - Use string and pattern search commands for content inspection\n");
         break;
 
     case FORMAT_RAW:

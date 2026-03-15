@@ -1,4 +1,7 @@
-#include "disassembler.h"
+#include "analysis_api.h"
+
+#include <stdio.h>
+#include <string.h>
 
 // Advanced shellcode detection patterns
 static uint8_t shellcode_patterns[][8] = {

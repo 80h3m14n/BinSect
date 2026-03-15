@@ -1,5 +1,9 @@
-#include "disassembler.h"
+#include "disasm_api.h"
+#include "output_api.h"
+
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <ctype.h>
 
 // Output raw bytes

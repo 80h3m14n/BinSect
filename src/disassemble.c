@@ -1,4 +1,8 @@
-#include "disassembler.h"
+#include "analysis_api.h"
+#include "disasm_api.h"
+
+#include <stdio.h>
+#include <string.h>
 
 // Common x86-64 instruction patterns that may indicate vulnerabilities
 static VulnPattern vuln_patterns[] = {

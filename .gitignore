@@ -1,0 +1,10 @@
+logs
+
+# Local build artifacts
+BinSect
+binsect
+*_debug
+*.o
+
+# Plugin build artifacts
+plugins/*.so
