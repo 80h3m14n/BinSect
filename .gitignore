@@ -1,7 +1,6 @@
 logs
 
 # Local build artifacts
-BinSect
 binsect
 *_debug
 *.o
