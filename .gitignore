@@ -1,7 +1,9 @@
 logs
+.vscode
 
 # Local build artifacts
 binsect
+/bin
 *_debug
 *.o
 

@@ -2,43 +2,60 @@
 
 This document is a quick command guide for BinSect CLI and interactive mode.
 
-## 1. Build and Run
 
-```bash
-make
-./binsect /usr/bin/ls
-```
+## Basic commands
 
-If installed globally:
+Commands can be either short-hand i,e -h or long-form i.e --help. Commands are case-insensitive.
 
-```bash
-binsect /usr/bin/ls
-```
 
-## 2. CLI Commands
+| Command | Task |
+|---------|------|
+| ?       | Show help |
+| clear   | Clear screen |
+| exit    | Exit interactive mode |
+| h       | Show help |
+| i       | Show file info (format, size, seek offset, verbose state) |
+| load    | Load/reload a file |
+| p       | Print data (disassembly, hex, strings, etc.) |
+| t       | Toggle output format (byte, assembly, strings, hex, all) |
+| q       | Quit interactive mode |
+| v       | Toggle verbose mode |
+
+
+
+## CLI Commands
 
 ### Basic usage
 
 ```bash
-./binsect [options] <binary_file>
+binsect [options] <binary_file>
 ```
 
-### Options
 
-- `-h`, `--help`: Show help.
-- `-v`, `--verbose`: Enable verbose analysis output.
-- `-i`, `--interactive`: Start interactive REPL.
-- `-f`, `--format`: Select output format.
-- `-t`, `--type`: Force file type.
+### CLI Examples
 
-### Output format values (`-f`)
+```bash
+binsect /bin/ls
+binsect -v /usr/bin/ls
+binsect -f hex /usr/bin/passwd
+binsect -f strings README.md
+binsect -t elf -f assembly /usr/bin/ls
+binsect -i /usr/bin/ls
+```
 
-- `byte`
-- `assembly`
-- `strings`
-- `hex`
-- `all`
-- `<plugin-mode>` (for plugin-registered modes, for example `entropy`)
+## Interactive Mode Commands
+
+Start interactive mode:
+
+```bash
+./binsect -i
+```
+
+Or auto-load a file at startup:
+
+```bash
+./binsect -i /usr/bin/ls
+```
 
 ### File type values (`-t`)
 
@@ -59,37 +76,6 @@ binsect /usr/bin/ls
 - `javascript`
 - `firmware`
 
-### CLI Examples
-
-```bash
-./binsect /bin/ls
-./binsect -v /usr/bin/ls
-./binsect -f hex /usr/bin/passwd
-./binsect -f strings README.md
-./binsect -t elf -f assembly /usr/bin/ls
-./binsect -i /usr/bin/ls
-```
-
-## 3. Interactive Mode Commands
-
-Start interactive mode:
-
-```bash
-./binsect -i
-```
-
-Or auto-load a file at startup:
-
-```bash
-./binsect -i /usr/bin/ls
-```
-
-### Session control
-
-- `help` or `?`: Show command help.
-- `q`, `quit`, `exit`: Leave interactive mode.
-- `clear`: Clear terminal screen.
-- `verbose`: Toggle verbose mode on/off.
 
 ### File and info
 
@@ -123,7 +109,9 @@ Or auto-load a file at startup:
 - `sn` or `/xn`: Jump to next stored hit.
 - `sp` or `/xp`: Jump to previous stored hit.
 
-## 4. Interactive Workflow Example
+
+
+## Interactive Workflow Example
 
 ```text
 load /usr/bin/ls
@@ -135,7 +123,7 @@ px 64
 q
 ```
 
-## 5. Notes
+## Notes
 
 - Use `./binsect` in the project directory unless BinSect is installed into your PATH.
 - If no file is loaded in interactive mode, commands that require data will prompt you to run `load <file>`.

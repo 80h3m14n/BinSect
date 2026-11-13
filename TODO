@@ -1,27 +1,27 @@
-## Core features:
+## Project architecture
 
-- ✅ Byte output format
-- ✅ Assembly output format
-- ✅ String extraction (ASCII and Unicode)
-- ✅ Hex dump output
+- Add Configuration File Support (YAML/JSON config file for: Plugin directories, Default analysis options, Output formatting preferences, File type mappings)
+- Implement Proper Logging System
+- Add Result Caching with: File hash (SHA-256) as cache key, Configurable cache directory, TTL for cache entries, Cache invalidation on file change
+- Save command history to file
+- Add Syntax Highlighting
+- Improve Navigation
+- Improve documentation and help system
+
+
+## Security features
+
+- Sandboxing
+- Memory Safety Checks
+- Anti-Tampering
+- Input sanitization
+- Memory protection APIs
+- Plugin isolation, signing, and verification
+
 
 ## File format support:
 
-Detection executables file and parsing and analysis for:
-- ✅Executable files:  PE, ELF, Mach-O, Java class files, Android DEX, WebAssembly
-- ✅ Documents: PDF, DOCX, PPTX detection
-- ✅ Compressed - ZIP, TAR, APK
-- ✅ Scripts: PowerShell, Python, JavaScript detection with security analysis
 - Firmware: Intel HEX, Motorola S-record, raw firmware analysis
-
-
-
-## Enhanced CLI interface:
-
-- ✅ Multiple output format options (-f byte|assembly|strings|hex|all)
-- ✅ File type forcing (-t raw|pe|elf|apk|pdf|zip|tar)
-- ✅ Interactive mode (-i)
-- ✅ Verbose analysis (-v)
 
 
 ## Advanced Malware Detection
@@ -29,10 +29,6 @@ Detection executables file and parsing and analysis for:
 - Crypter Recognition: Detect encrypted/encoded payloads
 - Anti-Analysis Techniques: Find anti-debugging, anti-VM, sandbox evasion
 - Polymorphic Code Detection: Identify self-modifying code patterns
-- ✅ PACKER DETECTION: UPX, ASPack, Themida, VMProtect detection
-- ✅ Heuristic analysis with entropy calculation
-- ✅ Generic packer detection patterns
-- ✅ Confidence scoring and unpacking recommendations
 - Control Flow Flattening: Unravel obfuscated code
 - String Decryption: Runtime string analysis
 - Dead Code Elimination: Clean up analysis
@@ -44,6 +40,18 @@ Detection executables file and parsing and analysis for:
 - MIPS: Router/embedded device analysis
 - PowerPC: Legacy systems
 - RISC-V: Emerging architecture support
+
+
+## Vulnerability Detection
+
+- Pattern matching
+- Function-level analysis (identify dangerous functions)
+- CVE signature database
+- Heap analysis (use-after-free, double-free patterns)
+- Stack analysis (buffer overflow detection)
+- Format string vulnerability detection
+- Integer overflow/underflow detection
+
 
 ## Advanced Vulnerability Classes
 
@@ -69,25 +77,23 @@ Detection executables file and parsing and analysis for:
 - Signature Generation: Auto-generate YARA rules
 - False Positive Reduction: Smart filtering
 
+
 ## Visualization & Reporting
 
 - Control Flow Graphs: Visual representation
 - Call Graphs: Function relationship mapping
 - Heat Maps: Vulnerability density visualization
-- Export Formats: JSON, XML, CSV, SARIF
+- Export Formats: JSON, XML, CSV, SARIF, HTML
+- Add Performance Metrics: files analyzed, execution time, Memory usage, CPU load, I/O operations, patterns matched
+
 
 ## Integration Features
+
 - Plugin System: Extensible architecture
 - API Interface: REST API for automation
 - Database Backend: Store analysis results
 - SIEM Integration: Export to security platforms
-
-## Performance & Scalability
-
-- Parallel Processing: Multi-threaded analysis
-- Streaming Analysis: Large file handling
-- Caching System: Speed up repeated analysis
-- Distributed Processing: Cloud-scale analysis
+- YARA Rule Support
 
 
 ## Cryptocurrency & Blockchain
@@ -99,5 +105,22 @@ Detection executables file and parsing and analysis for:
 - Firmware Analysis: Extract and analyze firmware
 - Protocol Analysis: Custom protocol detection
 - Hardware Security: Boot process analysis
+
+
+## Build & deployment
+
+- Add CMake Support for cross-platform builds
+- Add Docker Support for containerized builds
+- Continuous Integration (CI/CD) pipelines via Github actions for automated testing and deployment
+- Package manager support (Homebrew, APT, YUM, RPM, Chocolatey etc.)
+
+## Performance & Scalability
+
+- Parallel Processing: Multi-threaded analysis
+- Streaming Analysis: Large file handling
+- Caching System: Speed up repeated analysis
+- Distributed Processing: Cloud-scale analysis
+- Memory-Mapped Files
+- Use Aho-Corasick algorithm for multi-pattern matching
 
 

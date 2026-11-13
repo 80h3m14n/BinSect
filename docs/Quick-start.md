@@ -2,6 +2,22 @@
 
 The name "BinSect" originates from a combination of "Bin" (short for binary, referring to binary files) and "Sect" (suggesting section or dissection), reflecting its purpose as a tool for dissecting and analyzing binary executables.
 
+
+## Build and Run
+
+```bash
+make
+./binsect /usr/bin/ls
+```
+
+If installed globally:
+
+```bash
+binsect /usr/bin/ls
+```
+
+
+
 ## Usage
 
 ```bash
@@ -22,3 +38,5 @@ The tool provides multiple analysis layers:
 3. **Code Flow Analysis**: Statistics on different operation types
 4. **Security Report**: Comprehensive risk assessment
 5. **Specialized Analysis**: Encryption, control flow, and threat detection
+
+

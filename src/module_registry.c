@@ -1,5 +1,6 @@
 #include "module_registry.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 #define MAX_OUTPUT_HANDLERS 32
@@ -179,7 +180,20 @@ PackerResult run_registered_packer_detectors(uint8_t *data, size_t length)
         PackerResult current = packer_detectors[i].detector(data, length);
         if (current.confidence >= best_result.confidence)
         {
+            // Free previous details before replacing
+            if (best_result.details)
+            {
+                free(best_result.details);
+            }
             best_result = current;
+        }
+        else
+        {
+            // Free current details if not used
+            if (current.details)
+            {
+                free(current.details);
+            }
         }
     }
 

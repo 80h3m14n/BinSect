@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+#include "core_types.h"
 #include "module_registry.h"
 #include "packer_api.h"
 
@@ -7,6 +8,18 @@
 #include <string.h>
 #include <ctype.h>
 #include <math.h>
+#include <limits.h>
+#include <errno.h>
+
+// Cleanup function for PackerResult
+void free_packer_result(PackerResult *result)
+{
+    if (result && result->details)
+    {
+        free(result->details);
+        result->details = NULL;
+    }
+}
 
 // Packer signature database
 typedef struct

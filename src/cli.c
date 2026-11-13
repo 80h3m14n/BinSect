@@ -1,4 +1,5 @@
 #include "analysis_api.h"
+#include "core_types.h"
 #include "disasm_api.h"
 #include "formats_api.h"
 #include "module_registry.h"
@@ -8,6 +9,7 @@
 
 #include <fcntl.h>
 #include <ctype.h>
+#include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -15,6 +17,44 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+// Input validation functions
+static bool is_valid_file_path(const char *path)
+{
+    if (path == NULL)
+        return false;
+
+    // Check for empty path
+    if (path[0] == '\0')
+        return false;
+
+    // Check for directory traversal attempts
+    if (strstr(path, "..") != NULL)
+        return false;
+
+    // Check for excessive length
+    if (strlen(path) > MAX_PATH_LENGTH - 1)
+        return false;
+
+    // Check for null bytes (could cause issues)
+    if (strchr(path, '\0') != NULL && strlen(path) != strlen(path))
+        return false;
+
+    return true;
+}
+
+static bool is_safe_file_size(off_t size)
+{
+    // Check for negative size
+    if (size < 0)
+        return false;
+
+    // Check for excessively large files (prevent DoS)
+    if (size > (off_t)MAX_SAFE_ALLOCATION)
+        return false;
+
+    return true;
+}
 
 static const size_t MAX_INTERACTIVE_FILE_SIZE = 10485760;
 
@@ -58,9 +98,16 @@ static bool parse_size_value(const char *text, size_t *out)
 
 static size_t clamp_view_size(size_t cursor, size_t total_size, size_t requested)
 {
-    if (cursor >= total_size)
+    // Check for overflow in cursor + requested
+    if (cursor > total_size)
     {
         return 0;
+    }
+
+    // Prevent overflow: if requested would overflow when added to cursor
+    if (requested > SIZE_MAX - cursor)
+    {
+        requested = SIZE_MAX - cursor;
     }
 
     const size_t remaining = total_size - cursor;
@@ -79,39 +126,85 @@ static bool load_file_into_buffer(const char *path, uint8_t **buffer, size_t *bu
         return false;
     }
 
+    // Validate path
+    if (!is_valid_file_path(path))
+    {
+        fprintf(stderr, "Error: Invalid file path: %s\n", path);
+        return false;
+    }
+
     int fd = open(path, O_RDONLY);
     if (fd == -1)
     {
+        fprintf(stderr, "Error: Cannot open file '%s': %s\n", path, strerror(errno));
         return false;
     }
 
     struct stat st;
     if (fstat(fd, &st) != 0)
     {
+        fprintf(stderr, "Error: Cannot stat file '%s': %s\n", path, strerror(errno));
         close(fd);
         return false;
     }
 
-    if (st.st_size > (off_t)MAX_INTERACTIVE_FILE_SIZE)
+    // Validate file size
+    if (!is_safe_file_size(st.st_size))
     {
-        st.st_size = (off_t)MAX_INTERACTIVE_FILE_SIZE;
+        fprintf(stderr, "Error: File '%s' is too large or has invalid size\n", path);
+        close(fd);
+        return false;
     }
 
-    uint8_t *tmp = malloc((size_t)st.st_size);
+    // Limit size for interactive mode
+    size_t read_size = (size_t)st.st_size;
+    if (read_size > MAX_INTERACTIVE_FILE_SIZE)
+    {
+        fprintf(stderr, "Warning: File is large (%ld bytes). Loading first %zu bytes only.\n", 
+                st.st_size, MAX_INTERACTIVE_FILE_SIZE);
+        read_size = MAX_INTERACTIVE_FILE_SIZE;
+    }
+
+    // Check for potential overflow in allocation
+    if (read_size > MAX_SAFE_ALLOCATION)
+    {
+        fprintf(stderr, "Error: File too large to allocate memory\n");
+        close(fd);
+        return false;
+    }
+
+    uint8_t *tmp = malloc(read_size);
     if (tmp == NULL)
     {
+        fprintf(stderr, "Error: Memory allocation failed for %zu bytes\n", read_size);
         close(fd);
         return false;
     }
 
-    ssize_t read_bytes = read(fd, tmp, (size_t)st.st_size);
+    ssize_t read_bytes = read(fd, tmp, read_size);
     close(fd);
 
-    if (read_bytes <= 0)
+    if (read_bytes < 0)
+    {
+        fprintf(stderr, "Error: Failed to read file '%s': %s\n", path, strerror(errno));
+        free(tmp);
+        return false;
+    }
+
+    if ((size_t)read_bytes < read_size)
+    {
+        fprintf(stderr, "Warning: Only read %zd of %zu bytes from '%s'\n", 
+                read_bytes, read_size, path);
+    }
+
+    // Realloc to actual size read
+    uint8_t *final_buf = realloc(tmp, (size_t)read_bytes);
+    if (final_buf == NULL)
     {
         free(tmp);
         return false;
     }
+    tmp = final_buf;
 
     if (*buffer != NULL)
     {
@@ -277,54 +370,89 @@ FileFormat parse_file_format(const char *format_str)
 
 int analyze_file(const char *filename, bool verbose, const char *output_mode, FileFormat force_format)
 {
-    printf("Analyzing file: %s\n", filename);
+    // Validate file path
+    if (!is_valid_file_path(filename))
+    {
+        fprintf(stderr, "Error: Invalid file path: %s\n", filename);
+        return 1;
+    }
 
     int fd = open(filename, O_RDONLY);
     if (fd == -1)
     {
-        perror("Error opening file");
+        fprintf(stderr, "Error: Cannot open file '%s': %s\n", filename, strerror(errno));
         return 1;
     }
+
+    printf("Analyzing file: %s\n", filename);
 
     struct stat st;
     if (fstat(fd, &st) == -1)
     {
-        perror("Error getting file stats");
+        fprintf(stderr, "Error: Cannot stat file '%s': %s\n", filename, strerror(errno));
         close(fd);
         return 1;
     }
 
-    if (st.st_size > 10485760)
+    // Validate file size
+    if (!is_safe_file_size(st.st_size))
     {
-        printf("Warning: File is large (%ld bytes). Analyzing first 10MB only.\n", st.st_size);
-        st.st_size = 10485760;
+        fprintf(stderr, "Error: File '%s' is too large or has invalid size\n", filename);
+        close(fd);
+        return 1;
     }
 
-    uint8_t *buffer = malloc(st.st_size);
+    size_t read_size = (size_t)st.st_size;
+    if (read_size > DEFAULT_MAX_FILE_SIZE)
+    {
+        fprintf(stderr, "Warning: File is large (%ld bytes). Analyzing first %zu bytes only.\n", 
+                (long)st.st_size, (size_t)DEFAULT_MAX_FILE_SIZE);
+        read_size = DEFAULT_MAX_FILE_SIZE;
+    }
+
+    // Check for potential overflow in allocation
+    if (read_size > MAX_SAFE_ALLOCATION)
+    {
+        fprintf(stderr, "Error: File too large to allocate memory\n");
+        close(fd);
+        return 1;
+    }
+
+    uint8_t *buffer = malloc(read_size);
     if (!buffer)
     {
-        perror("Error allocating memory");
+        fprintf(stderr, "Error: Memory allocation failed for %zu bytes\n", read_size);
         close(fd);
         return 1;
     }
 
-    ssize_t bytes_read = read(fd, buffer, st.st_size);
-    if (bytes_read == -1)
-    {
-        perror("Error reading file");
-        free(buffer);
-        close(fd);
-        return 1;
-    }
-
+    ssize_t bytes_read = read(fd, buffer, read_size);
     close(fd);
 
-    printf("File size: %ld bytes\n", bytes_read);
+    if (bytes_read < 0)
+    {
+        fprintf(stderr, "Error: Failed to read file '%s': %s\n", filename, strerror(errno));
+        free(buffer);
+        return 1;
+    }
+
+    if ((size_t)bytes_read < read_size)
+    {
+        fprintf(stderr, "Warning: Only read %zd of %zu bytes from '%s'\n", 
+                bytes_read, read_size, filename);
+        // Realloc to actual size
+        uint8_t *tmp = realloc(buffer, (size_t)bytes_read);
+        if (tmp)
+            buffer = tmp;
+    }
+
+    printf("File size: %ld bytes\n", (long)bytes_read);
 
     FileFormat detected_format = (force_format != FORMAT_UNKNOWN) ? force_format : detect_file_format(buffer, bytes_read);
 
     PackerResult packer_result = detect_packer(buffer, bytes_read);
     print_packer_info(&packer_result);
+    free_packer_result(&packer_result);
 
     bool continue_disasm = process_file_format(buffer, bytes_read, detected_format);
 
@@ -363,13 +491,44 @@ int analyze_file(const char *filename, bool verbose, const char *output_mode, Fi
     return 0;
 }
 
-void interactive_mode(const char *startup_file)
+void interactive_mode(const char *startup_file, bool verbose)
 {
-    char command[256];
-    char history[128][256] = {{0}};
+    char *command = malloc(MAX_COMMAND_LENGTH);
+    if (!command) {
+        fprintf(stderr, "Error: Memory allocation failed\n");
+        return;
+    }
+    
+    // Dynamic history storage
+    char **history = malloc(128 * sizeof(char *));
+    if (!history) {
+        free(command);
+        fprintf(stderr, "Error: Memory allocation failed\n");
+        return;
+    }
+    for (int i = 0; i < 128; i++) {
+        history[i] = malloc(MAX_COMMAND_LENGTH);
+        if (!history[i]) {
+            // Cleanup already allocated
+            for (int j = 0; j < i; j++) free(history[j]);
+            free(history);
+            free(command);
+            fprintf(stderr, "Error: Memory allocation failed\n");
+            return;
+        }
+        history[i][0] = '\0';
+    }
+    
     size_t history_count = 0;
     ssize_t history_index = -1;
-    char filename[256] = {0};
+    char *filename = malloc(MAX_PATH_LENGTH);
+    if (!filename) {
+        for (int i = 0; i < 128; i++) free(history[i]);
+        free(history);
+        free(command);
+        fprintf(stderr, "Error: Memory allocation failed\n");
+        return;
+    }
     uint8_t *buffer = NULL;
     size_t buffer_size = 0;
     size_t cursor = 0;
@@ -380,14 +539,13 @@ void interactive_mode(const char *startup_file)
     size_t search_hits[4096] = {0};
     size_t search_hit_count = 0;
     ssize_t search_hit_index = -1;
-    bool verbose = false;
 
     printf("BinSect Interactive Mode (radare2-style) - Type '?' for commands\n");
 
     if (startup_file != NULL)
     {
-        strncpy(filename, startup_file, sizeof(filename) - 1);
-        filename[sizeof(filename) - 1] = '\0';
+        strncpy(filename, startup_file, MAX_PATH_LENGTH - 1);
+        filename[MAX_PATH_LENGTH - 1] = '\0';
 
         if (load_file_into_buffer(filename, &buffer, &buffer_size))
         {
@@ -401,6 +559,7 @@ void interactive_mode(const char *startup_file)
             {
                 PackerResult p = detect_packer(buffer, buffer_size);
                 print_packer_info(&p);
+                free_packer_result(&p);
             }
         }
         else
@@ -414,7 +573,7 @@ void interactive_mode(const char *startup_file)
         printf("[0x%08zx]> ", cursor);
         fflush(stdout);
 
-        if (fgets(command, sizeof(command), stdin) == NULL)
+        if (fgets(command, MAX_COMMAND_LENGTH, stdin) == NULL)
         {
             break;
         }
@@ -469,8 +628,8 @@ void interactive_mode(const char *startup_file)
 
             if (valid_history_nav && history_count > 0 && history_index >= 0)
             {
-                strncpy(command, history[history_index], sizeof(command) - 1);
-                command[sizeof(command) - 1] = '\0';
+                strncpy(command, history[history_index], MAX_COMMAND_LENGTH - 1);
+                command[MAX_COMMAND_LENGTH - 1] = '\0';
                 printf("%s\n", command);
             }
             else
@@ -491,15 +650,23 @@ void interactive_mode(const char *startup_file)
             history_index = -1;
             if (command[0] != '\0')
             {
-                if (history_count < (sizeof(history) / sizeof(history[0])))
+                const size_t max_history = 128;
+                if (history_count < max_history)
                 {
-                    snprintf(history[history_count], sizeof(history[history_count]), "%s", command);
+                    strncpy(history[history_count], command, MAX_COMMAND_LENGTH - 1);
+                    history[history_count][MAX_COMMAND_LENGTH - 1] = '\0';
                     history_count++;
                 }
                 else
                 {
-                    memmove(history, history + 1, (sizeof(history) / sizeof(history[0]) - 1) * sizeof(history[0]));
-                    snprintf(history[sizeof(history) / sizeof(history[0]) - 1], sizeof(history[0]), "%s", command);
+                    // Shift history up
+                    for (size_t i = 0; i < max_history - 1; i++)
+                    {
+                        strncpy(history[i], history[i + 1], MAX_COMMAND_LENGTH - 1);
+                        history[i][MAX_COMMAND_LENGTH - 1] = '\0';
+                    }
+                    strncpy(history[max_history - 1], command, MAX_COMMAND_LENGTH - 1);
+                    history[max_history - 1][MAX_COMMAND_LENGTH - 1] = '\0';
                 }
             }
         }
@@ -515,8 +682,8 @@ void interactive_mode(const char *startup_file)
         }
         else if (strncmp(command, "load ", 5) == 0)
         {
-            strncpy(filename, command + 5, sizeof(filename) - 1);
-            filename[sizeof(filename) - 1] = '\0';
+            strncpy(filename, command + 5, MAX_PATH_LENGTH - 1);
+            filename[MAX_PATH_LENGTH - 1] = '\0';
 
             if (load_file_into_buffer(filename, &buffer, &buffer_size))
             {
@@ -530,6 +697,7 @@ void interactive_mode(const char *startup_file)
                 {
                     PackerResult p = detect_packer(buffer, buffer_size);
                     print_packer_info(&p);
+                    free_packer_result(&p);
                 }
             }
             else
@@ -968,6 +1136,15 @@ void interactive_mode(const char *startup_file)
     {
         free(buffer);
     }
+    
+    // Cleanup dynamically allocated memory
+    free(filename);
+    for (int i = 0; i < 128; i++) {
+        free(history[i]);
+    }
+    free(history);
+    free(command);
+    
     printf("Goodbye!\n");
 }
 
@@ -1030,6 +1207,13 @@ int main(int argc, char *argv[])
         }
         else if (argv[i][0] != '-')
         {
+            // Validate file path
+            if (!is_valid_file_path(argv[i]))
+            {
+                fprintf(stderr, "Error: Invalid file path: %s\n", argv[i]);
+                print_usage(argv[0]);
+                return 1;
+            }
             filename = argv[i];
         }
         else
@@ -1042,7 +1226,14 @@ int main(int argc, char *argv[])
 
     if (interactive)
     {
-        interactive_mode(filename);
+        // Validate filename if provided
+        if (filename && !is_valid_file_path(filename))
+        {
+            fprintf(stderr, "Error: Invalid file path: %s\n", filename);
+            unload_plugins();
+            return 1;
+        }
+        interactive_mode(filename, verbose);
         unload_plugins();
         return 0;
     }
@@ -1055,6 +1246,13 @@ int main(int argc, char *argv[])
 
     if (filename)
     {
+        // Final validation before analysis
+        if (!is_valid_file_path(filename))
+        {
+            fprintf(stderr, "Error: Invalid file path: %s\n", filename);
+            unload_plugins();
+            return 1;
+        }
         int rc = analyze_file(filename, verbose, output_mode, force_format);
         unload_plugins();
         return rc;

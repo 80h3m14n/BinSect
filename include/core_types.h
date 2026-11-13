@@ -5,6 +5,18 @@
 #include <stddef.h>
 #include <stdint.h>
 
+// Maximum safe allocation size (128MB)
+#define MAX_SAFE_ALLOCATION (128 * 1024 * 1024)
+
+// Maximum file size to load (10MB for interactive, configurable)
+#define DEFAULT_MAX_FILE_SIZE (10 * 1024 * 1024)
+
+// Maximum path length
+#define MAX_PATH_LENGTH 4096
+
+// Maximum command length
+#define MAX_COMMAND_LENGTH 4096
+
 typedef enum
 {
     OUTPUT_BYTE,
@@ -69,6 +81,10 @@ typedef struct
     bool is_ascii;
     bool is_unicode;
 } StringResult;
+
+// Cleanup functions
+void free_packer_result(PackerResult *result);
+void free_string_results(StringResult *results, size_t count);
 
 typedef enum
 {

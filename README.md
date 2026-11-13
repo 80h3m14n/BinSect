@@ -1,19 +1,23 @@
-# Binsect - Security Analysis Tool
+## Binsect - Security Analysis Tool
 
-A comprehensive security analysis tool that performs disassembly, vulnerability detection, packer analysis, and multi-format file inspection.
-
+A comprehensive security analysis tool that performs  disassembly, vulnerability detection, packer analysis, and multi-format file inspection.
 
 
 ## Features
 
-### 🔍 Core Analysis
+### Core Analysis
 
 - **x86-64 Disassembly**: Instruction decoding with security pattern detection
 - **Multiple Output Formats**: Hex dump, byte arrays, assembly mnemonics, string extraction
 - **Security analysis**: Packer Detection, malicious pattern recognition, control flow analysis
 - **Interactive Mode**: Command-line interface for dynamic analysis
 
-### 📁 File Format Support
+### Architecture Support
+
+- x64, ARM, ARM64, MIPS, PowerPC, RISC-V
+
+
+### File Format Support
 
 | Category        | Formats                | Analysis Features                     |
 | --------------- | ---------------------- | ------------------------------------- |
@@ -26,7 +30,7 @@ A comprehensive security analysis tool that performs disassembly, vulnerability 
 | **Firmware**    | IoT images             | Entropy analysis, signature detection |
 
 
-### 🛡️ Security Analysis
+### Security Analysis
 
 - **Vulnerability Patterns**: Buffer overflows, ROP gadgets, shellcode signatures
 - **Risk Assessment**: Automated security scoring with color-coded severity
@@ -36,8 +40,6 @@ A comprehensive security analysis tool that performs disassembly, vulnerability 
 - **Malware Indicators**: Anti-analysis, obfuscation patterns,  polymorphic code patterns
 
 
-
----
 
 ## Installation
 
@@ -71,15 +73,13 @@ make debug        # Debug build with GDB support
 ```
 
 
----
-
-
 ## License
 
 Educational and security research tool. Use responsibly and in compliance with applicable laws.
 
-## ⚠️ Disclaimer
 
-This tool was developed with the help of[GitHub Copilot's](https://github.com/copilot) AI code generation capabilities.
+## Disclaimer
+
+This repo was developed with the help of [GitHub Copilot's](https://github.com/copilot) AI code generation capabilities.
 
 > It is intended for educational purposes only and should not be used for any illegal or unethical activities. The developers are not responsible for any misuse of this tool. Always ensure you have proper authorization before analyzing or testing any software or systems.

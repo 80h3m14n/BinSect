@@ -110,7 +110,18 @@ bool is_unicode_string(uint8_t *data, size_t len)
 // Extract strings from binary data
 StringResult *extract_strings(uint8_t *data, size_t length, size_t *count)
 {
+    if (data == NULL || length == 0 || count == NULL)
+    {
+        *count = 0;
+        return NULL;
+    }
+
     StringResult *results = malloc(1000 * sizeof(StringResult)); // Initial allocation
+    if (results == NULL)
+    {
+        *count = 0;
+        return NULL;
+    }
     size_t result_count = 0;
     size_t capacity = 1000;
 
@@ -131,10 +142,33 @@ StringResult *extract_strings(uint8_t *data, size_t length, size_t *count)
                 if (result_count >= capacity)
                 {
                     capacity *= 2;
-                    results = realloc(results, capacity * sizeof(StringResult));
+                    StringResult *new_results = realloc(results, capacity * sizeof(StringResult));
+                    if (new_results == NULL)
+                    {
+                        // Free existing results before returning
+                        for (size_t j = 0; j < result_count; j++)
+                        {
+                            free(results[j].text);
+                        }
+                        free(results);
+                        *count = 0;
+                        return NULL;
+                    }
+                    results = new_results;
                 }
 
                 results[result_count].text = malloc(str_len + 1);
+                if (results[result_count].text == NULL)
+                {
+                    // Free existing results before returning
+                    for (size_t j = 0; j < result_count; j++)
+                    {
+                        free(results[j].text);
+                    }
+                    free(results);
+                    *count = 0;
+                    return NULL;
+                }
                 memcpy(results[result_count].text, &data[start], str_len);
                 results[result_count].text[str_len] = '\0';
                 results[result_count].offset = start;
@@ -163,10 +197,33 @@ StringResult *extract_strings(uint8_t *data, size_t length, size_t *count)
                 if (result_count >= capacity)
                 {
                     capacity *= 2;
-                    results = realloc(results, capacity * sizeof(StringResult));
+                    StringResult *new_results = realloc(results, capacity * sizeof(StringResult));
+                    if (new_results == NULL)
+                    {
+                        // Free existing results before returning
+                        for (size_t j = 0; j < result_count; j++)
+                        {
+                            free(results[j].text);
+                        }
+                        free(results);
+                        *count = 0;
+                        return NULL;
+                    }
+                    results = new_results;
                 }
 
                 results[result_count].text = malloc(str_len + 1);
+                if (results[result_count].text == NULL)
+                {
+                    // Free existing results before returning
+                    for (size_t j = 0; j < result_count; j++)
+                    {
+                        free(results[j].text);
+                    }
+                    free(results);
+                    *count = 0;
+                    return NULL;
+                }
                 for (size_t j = 0; j < str_len; j++)
                 {
                     results[result_count].text[j] = data[start + j * 2];
