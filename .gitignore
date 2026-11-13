@@ -1,5 +1,5 @@
 logs
-.vscode
+.vscode/*
 
 # Local build artifacts
 binsect
